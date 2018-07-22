@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>登录系统</title>
+</head>
+<style>
+    ul li{
+        list-style-type: none;
+    }
+
+    #loggedout{
+        text-align: center;
+    }
+
+    #loggedin{
+        text-align: center;
+        display: none;
+    }
+
+    .alert{
+        display: none;
+    }
+
+    .submit{
+        padding: 5px 10px;
+        font-size: 13px;
+        color: black;
+        border: none;
+        background-color: #efefef;
+        animation: submit 0.3s linear;
+        margin-left: 50px;
+    }
+
+    .submit:hover{
+        animation: submit_hover 0.3s linear;
+        background-color: black;
+        color: white;
+    }
+
+    @keyframes submit_hover{
+        from{
+            background-color: #efefef;
+        }to{
+            background-color: black;
+        }
+    }
+
+    @keyframes submit{
+        from{
+            background-color:black;
+        }to{
+            background-color: #efefef;
+        }
+    }
+</style>
+<body>
+    <div style='text-align: center;'>超时时间60秒,登录不用填用户名</div>
+    <div id="submitting_alert" class="alert"></div>
+    <form id="loggedout">
+        <ul id="loggedout_listContainer">
+            <li>用户名: <input type="text" name="username" /></li>
+            <li>&nbsp;&nbsp;&nbsp;账号: <input type="text" name="account" /></li>
+            <li>&nbsp;&nbsp;&nbsp;密码: <input type="password" name="password" /></li>
+            <li>
+                <input class="submit" type="button" name="signin" value="登录" onclick="checkAndLogIn('signin')" />
+                <input class="submit" type="button" name="signup" value="注册" onclick="checkAndLogIn('signup')" />
+            </li>
+        </ul>
+    </form>
+    <form id="loggedin">
+        <ul>
+            <li id="username"></li>
+            <li><input class="submit" type="button" name="whoru" value="将token发给服务器看看你是谁" onclick="whoRU()" /></li>
+            <li><input class="submit" type="button" name="signout" value="登出" onclick="signOut()" /></li>
+        </ul>
+    </form>
+</body>
+<script src="https://cdn.bootcss.com/react/15.4.2/react.min.js"></script>
+<script src="https://cdn.bootcss.com/react/15.4.2/react-dom.min.js"></script>
+<script src="https://cdn.bootcss.com/babel-standalone/6.22.1/babel.min.js"></script>
+<script type="text/babel">
+    var myinterface = "https://laravel.ela.moe/auth";
+    var token = "";
+    var loggedout = document.getElementById("loggedout");
+    var loggedin = document.getElementById("loggedin");
+    var error_message = document.createElement('li');
+
+    error_message.setAttribute("class", "error_message");
+
+    //用于加载完成时判断登录状态
+    (function(){
+        let data = {};
+        data['event'] = 'onload';
+
+        fetch(myinterface,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/json'
+            },
+            body: JSON.stringify(data),
+        }).then(function(res){
+                if(res.status != 200){
+                    console.log("Error, status: " + res.status);
+                    return;
+                }else{
+                    console.log("Success, status: " + res.status);
+                    return res.json();
+                }
+            }).then(function(res){
+                console.log(res);
+                if(res['code'] == '5000'){
+                    token = res['token'];
+
+                    loggedout.style.display = 'none';
+                    let username = loggedin.children[0].children[0];
+                    username.innerHTML = res['username'];
+                    loggedin.style.display = 'inline';
+                }
+            }).catch(function(err){
+                console.log("Fetch Error: " + err);
+        });
+    })();
+
+    function checkAndLogIn(event) {
+        let username = loggedout.username.value;
+        let account = loggedout.account.value;
+        let password = loggedout.password.value;
+        showAlertMessage("信息提交中...", loggedout);
+
+        if(account.length >= 16){
+            showElement(loggedout);
+
+            error_message.innerHTML = "账户太长";
+            loggedout.children[0].appendChild(error_message);
+        }else if(password.length >= 16){
+            showElement(loggedout);
+
+            error_message.innerHTML = "密码太长";
+            loggedout.children[0].appendChild(error_message);
+        }else if(username.length >= 16){
+            showElement(loggedout);
+
+            error_message.innerHTML = "用户名太长";
+            loggedout.children[0].appendChild(error_message);
+        }
+
+        let data = {};
+        data['username']    = username;
+        data['account']     = account;
+        data['password']    = password;
+        data['event']       = event;
+        
+        console.log(data);
+
+        fetch(myinterface,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/json'
+            },
+            body: JSON.stringify(data),
+            }).then(function(res){
+                if(res.status != 200){
+                    console.log("Error, status: " + res.status);
+                    return;
+                }else{
+                    console.log("Success, status: " + res.status);
+                    return res.json();
+                }
+            }).then(function(res){
+                if(res['code'] === '0'){
+                    token = res['token'];
+                    loggedin.children[0].children[0].innerHTML = res['username'];
+                    showElement(loggedin);
+                }else{
+                    showElement(loggedout);
+                    error_message.innerHTML = res['message'];
+                    loggedout.children[0].appendChild(error_message);
+                }
+                return;
+            }).catch(function(err){
+                console.log("Fetch Error: " + err);
+        });
+    }
+
+    function signOut(){
+        showAlertMessage("信息提交中.....", loggedin);
+
+        let data = {};
+        data['token'] = token;
+        data['event'] = 'signout';
+        fetch(myinterface,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/json'
+            },
+            body: JSON.stringify(data),
+        }).then(function(res){
+            if(res.status != 200){
+                console.log("Error, status: " + res.status);
+                return;
+            }else{
+                console.log("Success, status: " + res.status);
+                return res.json();
+            }
+        }).then(function(res){
+            if(res['code'] === '0'){
+                showElement(loggedout);
+
+                error_message.innerHTML = "登出成功";
+                loggedout.children[0].appendChild(error_message);
+            }else{
+                console.log(res);
+
+                showElement(loggedin);
+
+                error_message.innerHTML = "登出失败";
+                loggedin.children[0].appendChild(error_message);
+            }
+            return;
+        }).catch(function(err){
+                console.log("Fetch Error: " + err);
+        });
+    }
+
+    function whoRU(){
+        let data = {};
+        data['token'] = token;
+        data['event'] = 'whoRU';
+        fetch(myinterface,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/json'
+            },
+            body: JSON.stringify(data),
+        }).then(function(res){
+            if(res.status != 200){
+                console.log("Error, status: " + res.status);
+                return;
+            }else{
+                console.log("Success, status: " + res.status);
+                return res.json();
+            }
+        }).then(function(res){
+            if(res['code'] === '0'){
+                error_message.innerHTML = "你的用户名是: " + res['username'];
+                loggedin.children[0].appendChild(error_message);
+            }else if(res['code'] === '5001'){
+                error_message.innerHTML = '登录已过期';
+                loggedin.display.style = 'none';
+                showElement(loggedout);
+                loggedout.children[0].appendChild(error_message);
+            }else{
+                console.log(res);
+            }
+        }).catch(function(err){
+                console.log("Fetch Error: " + err);
+        });
+    }
+
+    function showAlertMessage(message,element = null){
+        if(element != null){
+            element.style.display = "none";
+        }
+        let msg = document.getElementById('submitting_alert');
+        msg.innerHTML = message;
+        msg.style.display = "inline";
+    }
+
+    function showElement(element){
+        let old_message = document.getElementsByClassName("error_message");
+        for(let i = 0; i < old_message.length; ++i){
+            old_message[i].parentNode.removeChild(old_message[i]);
+        }
+
+        let msg = document.getElementById('submitting_alert');
+        element.style.display = "inline";
+        msg.style.display = "none";
+    }
+</script>
+</html>
