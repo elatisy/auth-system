@@ -9,6 +9,7 @@ class AuthProcessor
 {
     private $return_arr =   [];
     private $table      =   'auth';
+    private $time_limit = 60;   //second
 
     public function Handle(Array $recv){
         if(isset($recv['event'])){
@@ -24,7 +25,9 @@ class AuthProcessor
                 $this->onload($recv);
             } elseif ($recv['event'] == 'signout') {
                 $this->signout($recv);
-            } else {
+            } elseif ($recv['event'] == 'whoRU') {
+                $this->whoRU($recv);
+            }else {
                 $this->setRetArr([
                     'code'      => '1002',
                     'message'   => '未知event'
@@ -130,7 +133,6 @@ class AuthProcessor
     private function onload(Array $recv){
         $rows = DB::table($this->table)->where('last_ip', '=' ,$recv['last_ip'])->get();
         $user = null;
-        $time_limit = 60;   //second
         $latest_time = 0;
         foreach ($rows as $row){
             if((intval($row->last_sign_in) > $latest_time ) && !$row->is_sign_out ){
@@ -141,7 +143,7 @@ class AuthProcessor
         if($user == null){return;}
 
         $now = Carbon::now()->timestamp;
-        if(($now - $latest_time) > $time_limit ){
+        if(($now - $latest_time) > $this->time_limit ){
             $this->setRetArr([
                 'code'      => '5001',
                 'message'   => '登录已过期'
@@ -166,6 +168,29 @@ class AuthProcessor
             return;
         }
         $this->writeTable(['is_sign_out'   => true],'token',$recv['token']);
+    }
+
+    private function whoRU(Array $recv){
+        $row = $this->showRow('token',$recv['token']);
+        if($row == null){
+            $this->setRetArr([
+                'code'      => '7001',
+                'message'   => '未知token'
+            ]);
+            return;
+        }
+
+        if(intval($row->last_sign_in) - Carbon::now()->timestamp > $this->time_limit){
+            $this->setRetArr([
+                'code'      => '5001',
+                'message'   => '登录已过期'
+            ]);
+            return;
+        }
+
+        $this->setRetArr([
+            'username'  => $row->username
+        ]);
     }
 
     private function writeTable(Array  $info, $line = null, $where = null){
