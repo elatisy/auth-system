@@ -12,17 +12,25 @@ class AuthProcessor
 
     public function Handle(Array $recv){
         if(isset($recv['event'])){
-            if(!$this->judge($recv)){
-                return json_encode($this->return_arr);
-            }
+//                if(!$this->judge($recv)){
+//                    return json_encode($this->return_arr);
+//                }
 
             if($recv['event'] == 'signup'){
                 $this->signup($recv);
-            }else{
-                $this->setRetArr(['code' => '1002','message' => '未知event']);
+            } elseif ($recv['event'] == 'signin') {
+                $this->signin($recv);
+            } else {
+                $this->setRetArr([
+                    'code'      => '1002',
+                    'message'   => '未知event'
+                ]);
             }
         }else{
-            $this->setRetArr(['code' => '1001','message' => 'event字段不存在']);
+            $this->setRetArr([
+                'code'      => '1001',
+                'message'   => 'event字段不存在'
+            ]);
         }
 
         if(!isset($this->return_arr['code'])){
@@ -85,10 +93,32 @@ class AuthProcessor
             $username = $this->showRow('token',$token);
             $username = $username->username;
             $this->setRetArr([
-                'code'       => '0',
-                'message'    => 'ok',
                 'username'   => $username,
                 'token'     => $token,
+            ]);
+        }
+    }
+
+    private function signin(Array $recv){
+
+        $row = $this->showRow('account',$recv['account']);
+        if($row == null || $recv['password'] != $row->password){
+            $this->setRetArr([
+                'code'      => '6001',
+                'message'   => '账号不存在或者密码错误'
+            ]);
+            return;
+        }
+
+        if($this->writeTable([
+            'last_sign_in'  => Carbon::now()->timestamp,
+            'last_ip'       => $recv['last_ip'],
+            'is_sign_out'   => false,
+        ],
+            'account',$recv['account'])){
+            $this->setRetArr([
+                'username'  => $row->username,
+                'token'     => $row->token
             ]);
         }
     }
