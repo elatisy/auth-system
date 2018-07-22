@@ -12,14 +12,18 @@ class AuthProcessor
 
     public function Handle(Array $recv){
         if(isset($recv['event'])){
-//                if(!$this->judge($recv)){
-//                    return json_encode($this->return_arr);
-//                }
+                if(!$this->judge($recv)){
+                    return json_encode($this->return_arr);
+                }
 
             if($recv['event'] == 'signup'){
                 $this->signup($recv);
             } elseif ($recv['event'] == 'signin') {
                 $this->signin($recv);
+            } elseif ($recv['event'] == 'onload') {
+                $this->onload($recv);
+            } elseif ($recv['event'] == 'signout') {
+                $this->signout($recv);
             } else {
                 $this->setRetArr([
                     'code'      => '1002',
@@ -123,6 +127,47 @@ class AuthProcessor
         }
     }
 
+    private function onload(Array $recv){
+        $rows = DB::table($this->table)->where('last_ip', '=' ,$recv['last_ip'])->get();
+        $user = null;
+        $time_limit = 60;   //second
+        $latest_time = 0;
+        foreach ($rows as $row){
+            if((intval($row->last_sign_in) > $latest_time ) && !$row->is_sign_out ){
+                $user = $row;
+                $latest_time = intval($row->last_sign_in);
+            }
+        }
+        if($user == null){return;}
+
+        $now = Carbon::now()->timestamp;
+        if(($now - $latest_time) > $time_limit ){
+            $this->setRetArr([
+                'code'      => '5001',
+                'message'   => '登录已过期'
+            ]);
+        }else{
+            $this->setRetArr([
+                'code'      => '5000',
+                'message'   => '登录未过期',
+                'username'  => $user->username,
+                'token'     => $user->token
+            ]);
+        }
+    }
+
+    private function signout(Array $recv){
+        $row = $this->showRow('token',$recv['token']);
+        if($row == null){
+            $this->setRetArr([
+                'code'      => '7001',
+                'message'   => '未知token'
+            ]);
+            return;
+        }
+        $this->writeTable(['is_sign_out'   => true],'token',$recv['token']);
+    }
+
     private function writeTable(Array  $info, $line = null, $where = null){
         try{
             if($where == null){
@@ -133,7 +178,7 @@ class AuthProcessor
             return true;
         }catch (\Exception $e){
             $this->setRetArr([
-                'code'      => '4000',
+                'code'      => '4001',
                 'message'   => '写数据库错误,错误为'.$e->getMessage(),
             ]);
             return false;
