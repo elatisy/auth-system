@@ -8,10 +8,10 @@ use \App\Auth\AuthProcessor;
 class AuthController extends Controller
 {
     public function handle(Request $request){
-        $arr = $request->all();
-        $arr = array_merge($arr,$request->getClientIps());
+//        return response($request->all());
+        $arr = array_merge($request->all(),['last_ip' => $request->getClientIps()[0]]);
 
         $processor = new AuthProcessor();
-        $processor->Handle($arr);
+        return response($processor->Handle($arr));
     }
 }
