@@ -20,6 +20,7 @@ class CreateAuthTable extends Migration
             $table->string('password');
             $table->string('token');
             $table->string('last_sign_in');
+            $table->string('last_ip');
             $table->boolean('is_sign_out');
             $table->timestamps();
         });
